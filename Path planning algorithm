@@ -1,0 +1,257 @@
+from dataclasses import dataclass
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+
+class Coordinate:
+    xCoordinate: float
+    yCoordinate: float
+
+    def __init__(self, xCoord: float, yCoord: float):
+        self.xCoordinate = xCoord
+        self.yCoordinate = yCoord
+
+    def printCoord(self):
+        print(f"The coordinates of this object are: ({self.xCoordinate}, {self.yCoordinate})")
+
+class Path:
+    pathVector: list[Coordinate]
+    startPos: Coordinate
+    endPos: Coordinate
+
+    def __init__(self):
+        # init
+        self.pathVector = []
+
+    def addCoord(self, Coord: Coordinate):
+        #add Coordinate to list
+        self.pathVector.append(Coord)
+        self.endPos = Coord
+        #print("Added coordinate to list")
+        #self.pathVector[counter].printCoord
+
+    def nextValue(self):
+        match len(self.pathVector):
+            case 0:
+                return -1
+            case _:
+                return self.pathVector[len(self.pathVector)-1]
+
+
+    def createLinearPath(self, startPos: Coordinate, endPos: Coordinate, slice: int):
+        # make line from startPos to endPos, slice it into slice pieces
+        if self.nextValue == -1 or self.nextValue != startPos:
+            #make line, but add startpoint to vector
+            # y = mx+b
+            # (y-y1)=((y2-y1)/(x2-x1))*(x-x1)
+            # y = ((y2-y1)/(x2-x1))*(x-x1)+y1
+
+            if (endPos.xCoordinate == startPos.xCoordinate):
+                # straight line going up or down
+
+                # slice the y-length:
+                length = endPos.yCoordinate - startPos.yCoordinate
+                step = length/slice
+
+                for i in range(slice+1):
+                    x = startPos.xCoordinate
+                    y = startPos.yCoordinate + i*step
+                    newCoord = Coordinate(x,y)
+                    self.addCoord(newCoord)
+            else:
+                for i in range(slice+1):
+                # find x coordinate, find y coordinate using x, add coordinate to path:
+
+                    # slice the x length:
+                    length = endPos.xCoordinate - startPos.xCoordinate
+                    step = (length / slice)
+
+                    x = startPos.xCoordinate + i*step
+                    y = ((endPos.yCoordinate-startPos.yCoordinate)/(endPos.xCoordinate-startPos.xCoordinate))*(x-startPos.xCoordinate)+startPos.yCoordinate
+                    newCoord = Coordinate(x,y)
+                    self.addCoord(newCoord)
+
+        else:
+            #make line, but don't add startpoint to vector
+            # y = mx+b
+            # (y-y1)=((y2-y1)/(x2-x1))*(x-x1)
+            # y = ((y2-y1)/(x2-x1))*(x-x1)+y1
+
+            # slice the x length:
+            length = endPos.xCoordinate - startPos.xCoordinate
+            step = length / slice
+            if (endPos.xCoordinate == startPos.xCoordinate):
+                # line straight up or down
+                for i in range(slice):
+                    x = startPos.xCoordinate
+                    y = startPos.yCoordinate + (i+1)*step
+                    newCoord = Coordinate(x,y)
+                    self.addCoord(newCoord)
+            else:
+                for i in range(slice):
+                # find x coordinate, find y coordinate using x, add coordinate to path:
+                    x = startPos.xCoordinate + (i+1)*step
+                    y = ((endPos.yCoordinate-startPos.yCoordinate)/(endPos.xCoordinate-startPos.xCoordinate))*(x-startPos.xCoordinate)+startPos.xCoordinate
+                    newCoord = Coordinate(x,y)
+                    self.addCoord(newCoord)
+
+
+    def distance(self, Coord1: Coordinate, Coord2: Coordinate):
+        return float(np.sqrt((Coord2.xCoordinate-Coord1.xCoordinate)**2 + (Coord2.yCoordinate-Coord1.yCoordinate)**2))
+
+    def createCurvedPath(self, startPos: Coordinate, endPos: Coordinate, radius: float, way: str, slice: int):
+
+        # the way variable MUST be chosen correctly to achive wanted path
+
+        # create circle equation:
+        # (x-h)^2+(y-k)^2 = r^2
+        # find circle center
+        
+        # make line between the two points:
+        chord = self.distance(startPos, endPos)
+        print(chord)
+        centerCoord = []
+        
+        match chord:
+            case 0:
+                print(" The start and stop point are the same! ")
+                return Coordinate(0,0)
+            case d if math.isclose(d,radius*2):
+                # only one solution
+                
+                # find center at midpoint of the chord
+                centerCoord1 = Coordinate((startPos.xCoordinate + endPos.xCoordinate) / 2, (startPos.yCoordinate + endPos.yCoordinate) / 2)
+                centerCoord.append(centerCoord1)
+            case _:
+                # two solutions
+                # there can be two differnet centers:
+                # find them with unit vector from centerpoint of chord
+
+                # distance between centerpoint and middle point of chord:
+                dist = np.sqrt(radius**2 - (chord**2)/4)
+
+                centerCoord1 = Coordinate(((startPos.xCoordinate + endPos.xCoordinate)/2)-dist*(endPos.yCoordinate - startPos.yCoordinate)/chord , ((startPos.yCoordinate + endPos.yCoordinate)/2)+dist*(endPos.xCoordinate - startPos.xCoordinate)/chord)
+                centerCoord2 = Coordinate(((startPos.xCoordinate + endPos.xCoordinate)/2)+dist*(endPos.yCoordinate - startPos.yCoordinate)/chord , ((startPos.yCoordinate + endPos.yCoordinate)/2)-dist*(endPos.xCoordinate - startPos.xCoordinate)/chord)
+                centerCoord.append(centerCoord1)
+                centerCoord.append(centerCoord2)
+
+        # find which centerCoord is the one to choose:
+        # Coord1 will be on the left side of the chord
+        # Coord2 will be on the right side of the chord
+
+        if way == "cw":
+            # split and add to path:
+            # (x-h)^2+(y-k)^2 = r^2
+            # parameterization : x = x_1 + rcos(t) , y = y_1 + rsin(t)
+            
+            # if there are two centers, one needs to be chosen, else use the only center there is
+            # for clockwise movement, the "bottom" circle needs to be used, so centerCoord2
+
+            cc = Coordinate(-1,-1)
+            match len(centerCoord):
+                case 2:
+                    # choose second element:
+                    cc = centerCoord[1]
+                case 1:
+                    # choose the only element:
+                    cc = centerCoord[0]
+                case 0:
+                    print(" ERROR ")
+
+            # t = np.atan2(y-y_1, x-x_1)
+            startAngle = np.arctan2(startPos.yCoordinate - cc.yCoordinate, startPos.xCoordinate - cc.xCoordinate)
+            endAngle = np.arctan2(endPos.yCoordinate - cc.yCoordinate, endPos.xCoordinate - cc.xCoordinate)
+            curve = startAngle - endAngle
+            angleStep = curve / slice
+            startPoint = Coordinate(cc.xCoordinate + radius*np.cos(startAngle), cc.yCoordinate + radius*np.sin(startAngle))
+            startPoint.printCoord()
+
+            for i in range(slice+1):
+                # move clockwise, stepping clockwise, using parameterization
+                newAngle = startAngle - i*angleStep
+                x = cc.xCoordinate + radius*np.cos(newAngle)
+                y = cc.yCoordinate + radius*np.sin(newAngle)
+                newPos = Coordinate(x,y)
+                self.addCoord(newPos)
+
+        elif way == "ccw":
+            # split and add to path:
+            # parameterization : x = x_1 + rcos(t) , y = y_1 + rsin(t)
+
+            # if there are two centers, one needs to be chosen, else use the only center there is
+            # for counter-clockwise movement, the "top" circle needs to be used, so centerCoord1
+            match len(centerCoord):
+                case 2:
+                    # choose first element:
+                    cc = centerCoord[0]
+                case 1:
+                    # choose the only element:
+                    cc = centerCoord[0]
+                case 0:
+                    print(" ERROR ")
+
+            # slice curve into 'slice' pieces
+            startAngle = np.arctan2(startPos.yCoordinate - cc.yCoordinate, startPos.xCoordinate - cc.xCoordinate)
+            endAngle = np.arctan2(endPos.yCoordinate - cc.yCoordinate, endPos.xCoordinate - cc.xCoordinate)
+            curve = startAngle - endAngle
+            angleStep = curve / slice
+
+            for i in range(slice+1):
+                # move clockwise, stepping clockwise, using parameterization
+                # step the angle step in the direction
+                newAngle = startAngle - i*angleStep
+                x = cc.xCoordinate + radius*np.cos(newAngle)
+                y = cc.yCoordinate + radius*np.sin(newAngle)
+                newPos = Coordinate(x,y)
+                self.addCoord(newPos)
+        else:
+            print("choose 'ccw' or 'cw'")
+
+        # small check to see that both start and endPoin are in the list , return clause
+        if startPos in self.pathVector and endPos in self.pathVector:
+            return cc
+        else: return Coordinate(0,0)
+
+    def __add__(self, other):
+        # the first list must end on the coordinate that the second list starts on
+        if not isinstance(other, Path):
+            return print("Cannot add objects since they are not of the same type!")
+        
+        else:
+                self.pathVector = self.pathVector + other.pathVector[1:]
+
+# VISUALIZATION CODE FOR TESTING:
+slices = 50
+gen = Path()
+
+# 2. Generate linear Path
+linear1 = gen.createLinearPath(Coordinate(0,0), Coordinate(0,4), slices)
+# 3. Generate CW Path
+center_cw = gen.createCurvedPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-2,3.5), 5, "ccw", slices)
+# 4. Generate linear path again:
+path = gen.createLinearPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-2,0), slices)
+# 5. Create CCW path 
+center_ccw = gen.createCurvedPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-4, 0.5), 5, "cw", slices)
+
+path_path = [(p.xCoordinate, p.yCoordinate) for p in gen.pathVector]
+
+# 4. Plotting
+plt.figure(figsize=(8, 8))
+
+# Plot the paths (The "Splines")
+p_x, p_y = zip(*path_path)
+plt.plot(p_x, p_y, 'red', label='First linear path', linewidth=2)
+
+start = gen.pathVector[0]
+end = gen.pathVector[-1]
+# Plot Start/End Points
+plt.scatter([start.xCoordinate, end.xCoordinate], [start.yCoordinate, end.yCoordinate], color='black', zorder=5)
+plt.annotate('Start', (start.xCoordinate, start.yCoordinate), textcoords="offset points", xytext=(0,10), ha='center')
+plt.annotate('End', (end.xCoordinate, end.yCoordinate), textcoords="offset points", xytext=(0,10), ha='center')
+
+# Formatting
+plt.gca().set_aspect('equal', adjustable='box')
+plt.title(f"Path planning algorithm visualization")
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.show()
