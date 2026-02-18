@@ -100,7 +100,7 @@ class Path:
         return float(np.sqrt((Coord2.xCoordinate-Coord1.xCoordinate)**2 + (Coord2.yCoordinate-Coord1.yCoordinate)**2))
 
     def createCurvedPath(self, startPos: Coordinate, endPos: Coordinate, radius: float, way: str, slice: int):
-
+        # return value is the center of the curved path, or the Coordinate(0,0) if the function fails
         # the way variable MUST be chosen correctly to achive wanted path
 
         # create circle equation:
@@ -115,6 +115,9 @@ class Path:
         match chord:
             case 0:
                 print(" The start and stop point are the same! ")
+                return Coordinate(0,0)
+            case d if d>2*radius: 
+                print(" The radius is too small to make the circle")
                 return Coordinate(0,0)
             case d if math.isclose(d,radius*2):
                 # only one solution
