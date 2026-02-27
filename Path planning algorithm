@@ -223,20 +223,136 @@ class Path:
         else:
                 self.pathVector = self.pathVector + other.pathVector[1:]
 
-# VISUALIZATION CODE FOR TESTING:
+class fieldClearingAlgorithm:
+
+    """
+    Docstring for fieldClearingAlgorithm:
+    
+    Plan a xy path for rock picker, making sure that the robot stays inside the fieldlines during opeartion.
+
+    The algorithm slices the field in robotSizeX wide pieces, then draws a path.
+
+    The coordinate system starts at (0,0) and goes to (xBoundary, yBoundary), creating rectangular fieldlines.
+
+    The path is linear with turns.
+    """
+
+    path: Path
+    xBoundary: float
+    yBoundary: float
+    robotSizeX: float
+    robotSizeY: float
+    robotStartCoord: Coordinate
+    robotTurningRadius: float 
+
+    def __init__(self, xB: float, yB: float, rSX: float, rSY: float, rSC: Coordinate, rD: str, rTR: float):
+        self.xBoundary = xB
+        self.yBoundary = yB
+        self.robotSizeX = rSX
+        self.robotSizeY = rSY
+        self.robotStartCoord = rSC
+        self.robotStartCoord.addDir(rD)
+        self.robotTurningRadius = rTR
+        self.path = Path()
+
+    def fieldSlices(self, length: float):
+        # returns the amount of slices the field has been sliced into
+        # can be done both for x and y
+        if length < self.robotSizeX:
+            return -1
+        else:
+            ret = length / self.robotSizeX
+            if ret - round(ret) < 0.1:
+                return round(ret)
+            else:
+                return ret
+        
+    def fieldSliceMidpoint(self, slices: float, length: float):
+        # find midpoint of each of the slices:
+        midpointList = []
+        step = length / slices
+        currentMP = step / 2
+        midpointList.append(currentMP)
+        while(currentMP + step <= length):
+            midpointList.append(currentMP + step)
+            currentMP += step
+        
+        # check if last point is also there:
+        if (currentMP != length):
+            midpointList.append(length - (step / 2))
+            return midpointList
+        else:
+            return midpointList
+    
+    def createPathA1(self):
+        # creates a path for the robot, way controls which way the robot clears
+        # "x" makes the algorithm slice the x-axis, "y" makes the algorithm slice the y-axis
+        slices = 0
+        length = 0
+        way = "x"
+        match way:
+            case "x":
+                slices = self.fieldSlices(self.xBoundary)
+                length = self.xBoundary
+            case "y":
+                slices = self.fieldSlices(self.yBoundary)
+                length = self.yBoundary
+            case _:
+                print(" Choose 'x' or 'y' ")
+                return -1
+
+        # check slices:
+        match slices: 
+            case -1:
+                print(" Field too small for the robot ")
+                return -1
+            case _:
+                # good to go
+                print(" Field is good size ")
+        print(slices)
+        # Find the midpoint for slices:
+        midpointList = self.fieldSliceMidpoint(slices, length)
+
+        # The robot should first move from where it currently is to the startpoint of the path
+    
+        # ALGORITHM VERSION 1:
+        # if the robot is not in the correct position it will first move to the bottom row, going to the first point
+        # THE ROBOT USES UWB TO CHECK IT'S POSITION; UWB HAS ACCURACY OF 10CM
+
+        # first check dir;
+
+        # START AT POINT, DIR UP (Y)
+        
+        start = Coordinate(self.robotSizeX/2, self.robotSizeY)
+        self.path.addCoord(start)
+        # make path
+        for i in range(len(midpointList)):
+            # make linear path from start to bottom or top if (1,3,5), then down, if (0,2,4) then down
+            start = self.path[-1]
+
+            if (i == len(midpointList)-2):
+                self.path.createLinearPath(start, Coordinate(start.xCoordinate,self.robotSizeY),50)
+            elif (i == len(midpointList)-1):
+                pass
+            else:
+                if (i % 2 == 0):
+                    print(i)
+                    self.path.createLinearPath(start, Coordinate(start.xCoordinate,self.yBoundary-self.robotTurningRadius),50)
+                    self.path.createCurvedPath(self.path[-1], Coordinate(midpointList[i+1], self.yBoundary - self.robotTurningRadius), self.robotTurningRadius, "cw", 50)
+                if (i % 2 == 1):
+                    print(i)
+                    self.path.createLinearPath(start, Coordinate(start.xCoordinate,self.robotTurningRadius),50)
+                    self.path.createCurvedPath(self.path[-1], Coordinate(midpointList[i+1], self.robotTurningRadius), self.robotTurningRadius, "ccw", 50)
+
+# --- Visualization Code ---
+
+ # TEST TO SEE THAT CODE WORKS
 slices = 50
-gen = Path()
+gen = fieldClearingAlgorithm(100, 100, 5, 10, Coordinate(0,0), "y", 5)
+gen.createPathA1()
 
-# 2. Generate linear Path
-linear1 = gen.createLinearPath(Coordinate(0,0), Coordinate(0,4), slices)
-# 3. Generate CW Path
-center_cw = gen.createCurvedPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-2,3.5), 5, "ccw", slices)
-# 4. Generate linear path again:
-path = gen.createLinearPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-2,0), slices)
-# 5. Create CCW path 
-center_ccw = gen.createCurvedPath(gen.pathVector[len(gen.pathVector)-1], Coordinate(-4, 0.5), 5, "cw", slices)
+path_path = [(p.xCoordinate, p.yCoordinate) for p in gen.path.pathVector]
 
-path_path = [(p.xCoordinate, p.yCoordinate) for p in gen.pathVector]
 
 # 4. Plotting
 plt.figure(figsize=(8, 8))
@@ -245,8 +361,8 @@ plt.figure(figsize=(8, 8))
 p_x, p_y = zip(*path_path)
 plt.plot(p_x, p_y, 'red', label='First linear path', linewidth=2)
 
-start = gen.pathVector[0]
-end = gen.pathVector[-1]
+start = gen.path.pathVector[0]
+end = gen.path.pathVector[-1]
 # Plot Start/End Points
 plt.scatter([start.xCoordinate, end.xCoordinate], [start.yCoordinate, end.yCoordinate], color='black', zorder=5)
 plt.annotate('Start', (start.xCoordinate, start.yCoordinate), textcoords="offset points", xytext=(0,10), ha='center')
@@ -257,4 +373,4 @@ plt.gca().set_aspect('equal', adjustable='box')
 plt.title(f"Path planning algorithm visualization")
 plt.legend()
 plt.grid(True, linestyle='--', alpha=0.6)
-plt.show()
+plt.show()      
